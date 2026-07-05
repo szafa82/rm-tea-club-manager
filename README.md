@@ -1,9 +1,5 @@
-# RM Tea Club Manager v2.1 SAFE
+# RM Tea Club Manager v3 SAFE
 
-Firebase App Hosting safe version.
+Safe ZIP update. No spreadsheet reload. No Firestore overwrite. Local browser storage only in this version.
 
-Important:
-- No automatic spreadsheet reload.
-- No automatic Firestore overwrite.
-- No seed data import on start.
-- Demo data is local browser fallback only.
+Upload contents to GitHub repo root. App root directory in Firebase App Hosting should stay empty.
