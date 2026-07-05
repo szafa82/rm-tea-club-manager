@@ -3,169 +3,121 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const STORAGE_KEY = 'rm-tea-club-v2-data';
+const VERSION = 'v2.1 SAFE';
+const STORAGE_KEY = 'rm-tea-club-v21-local-data';
 
-const starter = {
-  monthlyFee: 6,
-  year: 2026,
+const starterData = {
   members: [
-    { id: 'abbas', name: 'Abbas', paid: [0,1,2,3,4,5,6,7,8,9,10,11], pinned: true, notes: 'Paid until end of year' },
-    { id: 'adam', name: 'Adam', paid: [0,1,2,3,4,5,6], pinned: true, notes: 'Admin' },
-    { id: 'fred', name: 'Fred', paid: [0,1,2,3,4,5], pinned: false, notes: '' }
+    { id: 'abbas', name: 'Abbas', role: 'Member', paid: [0,1,2,3,4,5,6,7,8,9,10,11], notes: 'Paid until end of year' },
+    { id: 'adam', name: 'Adam', role: 'Treasurer', paid: [0,1,2,3,4,5,6], notes: 'Admin' },
+    { id: 'fred', name: 'Fred', role: 'Member', paid: [0,1,2,3,4,5], notes: '' },
+    { id: 'paul', name: 'Paul', role: 'Member', paid: [0,1,2,3], notes: '' }
   ],
   transactions: [
-    { id: 't1', date: '2026-07-01', type: 'payment', member: 'Abbas', category: 'Membership', amount: 72, note: 'Paid full year' },
-    { id: 't2', date: '2026-07-02', type: 'expense', member: '', category: 'Milk', amount: 8.5, note: 'Milk top up' },
-    { id: 't3', date: '2026-07-03', type: 'payment', member: 'Adam', category: 'Membership', amount: 6, note: 'July' }
+    { id: 't1', date: '2026-07-01', type: 'payment', member: 'Abbas', category: 'membership', amount: 72, note: 'Paid Jan-Dec' },
+    { id: 't2', date: '2026-07-02', type: 'payment', member: 'Adam', category: 'membership', amount: 6, note: 'July' },
+    { id: 't3', date: '2026-07-03', type: 'expense', member: '', category: 'milk', amount: 8.5, note: 'Milk' },
+    { id: 't4', date: '2026-07-04', type: 'expense', member: '', category: 'tea', amount: 12.2, note: 'Tea bags' }
   ],
   stock: [
-    { id: 's1', item: 'Tea bags', qty: 2, level: 'ok' },
-    { id: 's2', item: 'Milk', qty: 1, level: 'low' },
-    { id: 's3', item: 'Sugar', qty: 3, level: 'ok' }
+    { id: 's1', item: 'Tea bags', category: 'Tea', qty: 2, low: 1 },
+    { id: 's2', item: 'Milk', category: 'Milk', qty: 4, low: 3 },
+    { id: 's3', item: 'Sugar', category: 'Sugar', qty: 1, low: 1 }
   ],
-  audit: ['v2 created', 'Abbas marked paid until December']
+  settings: { monthlyFee: 6, year: 2026, clubName: 'RM Tea Club' }
 };
 
-function loadData() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || starter; } catch { return starter; }
+function loadData(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || starterData; } catch { return starterData; }
 }
+function saveData(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
-function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function Modal({ title, children, onClose }) {
-  return <div className="modalShade" onMouseDown={onClose}>
-    <div className="modal" onMouseDown={e => e.stopPropagation()}>
-      <div className="modalHead"><h2>{title}</h2><button onClick={onClose}>×</button></div>
-      {children}
-    </div>
-  </div>;
-}
-
-function App() {
+function App(){
   const [data, setData] = useState(loadData);
-  const [tab, setTab] = useState('dashboard');
+  const [page, setPage] = useState('dashboard');
   const [modal, setModal] = useState(null);
-  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [dark, setDark] = useState(false);
 
-  const update = (next, audit) => {
-    const value = { ...next, audit: [audit, ...(next.audit || [])].slice(0, 30) };
-    setData(value); saveData(value);
-  };
+  const update = (next) => { setData(next); saveData(next); };
+  const income = data.transactions.filter(t=>t.type==='payment').reduce((s,t)=>s+Number(t.amount),0);
+  const expenses = data.transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
+  const balance = income - expenses;
+  const currentMonth = new Date().getMonth();
+  const paidThisMonth = data.members.filter(m=>m.paid.includes(currentMonth)).length;
+  const unpaid = data.members.length - paidThisMonth;
 
-  const totals = useMemo(() => {
-    const paid = data.transactions.filter(t => t.type === 'payment').reduce((s,t) => s + Number(t.amount || 0), 0);
-    const spent = data.transactions.filter(t => t.type === 'expense').reduce((s,t) => s + Number(t.amount || 0), 0);
-    const currentMonth = new Date().getMonth();
-    const outstanding = data.members.filter(m => !m.paid.includes(currentMonth)).length;
-    return { paid, spent, balance: paid - spent, outstanding, members: data.members.length };
-  }, [data]);
+  const visibleMembers = useMemo(()=> data.members.filter(m=>m.name.toLowerCase().includes(query.toLowerCase())), [data.members, query]);
 
-  const filteredMembers = data.members.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
-  const filteredTransactions = data.transactions.filter(t => JSON.stringify(t).toLowerCase().includes(search.toLowerCase()));
-
-  const addMember = (name) => {
-    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
-    update({ ...data, members: [...data.members, { id, name, paid: [], pinned: false, notes: '' }] }, `Added member ${name}`);
-    setModal(null);
-  };
-
-  const addTransaction = (form) => {
-    const amount = Number(form.amount || 0);
-    const tx = { id: 'tx-' + Date.now(), ...form, amount };
-    update({ ...data, transactions: [tx, ...data.transactions] }, `Added ${form.type} £${amount}`);
-    setModal(null);
-  };
-
-  const toggleMonth = (memberId, month) => {
-    const members = data.members.map(m => {
-      if (m.id !== memberId) return m;
-      const paid = m.paid.includes(month) ? m.paid.filter(x => x !== month) : [...m.paid, month].sort((a,b)=>a-b);
-      return { ...m, paid };
-    });
-    update({ ...data, members }, 'Updated month status');
-  };
-
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'rm-tea-club-backup.json'; a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return <>
+  return <div className={dark ? 'app dark' : 'app'}>
     <aside className="sidebar">
-      <div className="brand"><span>RM</span><strong>Tea Club</strong><small>Manager v2</small></div>
-      {['dashboard','members','transactions','reports','stock','poster','settings'].map(x => <button className={tab===x?'active':''} onClick={()=>setTab(x)} key={x}>{x}</button>)}
+      <div className="brand"><div className="logo">RM</div><div><b>Tea Club</b><span>{VERSION}</span></div></div>
+      {['dashboard','members','transactions','reports','stock','poster','settings'].map(x => <button className={page===x?'active':''} onClick={()=>setPage(x)} key={x}>{label(x)}</button>)}
+      <button onClick={()=>setDark(!dark)}>{dark?'Light mode':'Dark mode'}</button>
     </aside>
     <main>
       <header>
-        <input placeholder="Search members, payments, milk..." value={search} onChange={e=>setSearch(e.target.value)} />
-        <button className="primary" onClick={()=>setModal('quick')}>+ Quick Add</button>
+        <div><h1>{label(page)}</h1><p>No spreadsheet auto-reload • No database overwrite • {VERSION}</p></div>
+        <input placeholder="Search members, transactions..." value={query} onChange={e=>setQuery(e.target.value)} />
+        <button className="primary" onClick={()=>setModal('quick')}>+ Quick add</button>
       </header>
-
-      {tab === 'dashboard' && <section>
-        <h1>Dashboard</h1>
-        <div className="cards">
-          <div className="card"><small>Balance</small><b>£{totals.balance.toFixed(2)}</b></div>
-          <div className="card"><small>Total paid</small><b>£{totals.paid.toFixed(2)}</b></div>
-          <div className="card"><small>Total spent</small><b>£{totals.spent.toFixed(2)}</b></div>
-          <div className="card"><small>Members</small><b>{totals.members}</b></div>
-          <div className="card warn"><small>Outstanding this month</small><b>{totals.outstanding}</b></div>
-        </div>
-        <div className="grid2">
-          <div className="panel"><h2>Recent activity</h2>{data.audit.map((a,i)=><p key={i}>• {a}</p>)}</div>
-          <div className="panel"><h2>Alerts</h2><p>Milk stock low</p><p>{totals.outstanding} member(s) unpaid this month</p></div>
-        </div>
-      </section>}
-
-      {tab === 'members' && <section>
-        <div className="titleRow"><h1>Members</h1><button className="primary" onClick={()=>setModal('member')}>Add member</button></div>
-        <div className="memberGrid">{filteredMembers.map(m => <div className="member" key={m.id}>
-          <div className="memberTop"><h2>{m.name}</h2><span>{m.pinned ? '★ pinned' : 'member'}</span></div>
-          <small>{m.notes || 'No notes'}</small>
-          <div className="months">{MONTHS.map((month,i)=><button key={month} onClick={()=>toggleMonth(m.id,i)} className={m.paid.includes(i)?'paid':'due'}>{month}</button>)}</div>
-        </div>)}</div>
-      </section>}
-
-      {tab === 'transactions' && <section>
-        <div className="titleRow"><h1>Transactions</h1><button className="primary" onClick={()=>setModal('transaction')}>Add transaction</button></div>
-        <table><thead><tr><th>Date</th><th>Type</th><th>Member</th><th>Category</th><th>Amount</th><th>Note</th></tr></thead><tbody>{filteredTransactions.map(t=><tr key={t.id}><td>{t.date}</td><td>{t.type}</td><td>{t.member}</td><td>{t.category}</td><td>£{Number(t.amount).toFixed(2)}</td><td>{t.note}</td></tr>)}</tbody></table>
-      </section>}
-
-      {tab === 'reports' && <section><h1>Reports PRO</h1><div className="cards"><div className="card"><small>Income</small><b>£{totals.paid.toFixed(2)}</b></div><div className="card"><small>Expenses</small><b>£{totals.spent.toFixed(2)}</b></div><div className="card"><small>Balance</small><b>£{totals.balance.toFixed(2)}</b></div></div><div className="panel"><h2>Mini report</h2><p>Members paid ahead: {data.members.filter(m=>m.paid.length > new Date().getMonth()+1).length}</p><p>Average transaction: £{(data.transactions.reduce((s,t)=>s+Number(t.amount||0),0)/Math.max(data.transactions.length,1)).toFixed(2)}</p></div></section>}
-
-      {tab === 'stock' && <section><h1>Stock</h1><div className="stockGrid">{data.stock.map(s=><div className={'stock '+s.level} key={s.id}><b>{s.item}</b><span>Qty: {s.qty}</span><small>{s.level}</small></div>)}</div></section>}
-
-      {tab === 'poster' && <section><h1>Poster Studio</h1><div className="poster"><h2>RM Tea Club</h2><p>Members list</p>{data.members.map(m=><span key={m.id}>{m.name}</span>)}</div><button onClick={()=>window.print()} className="primary">Print / Save as PDF</button></section>}
-
-      {tab === 'settings' && <section><h1>Settings</h1><div className="panel"><p>Monthly fee: £{data.monthlyFee}</p><p>Year: {data.year}</p><button onClick={exportJson}>Download backup JSON</button><button className="danger" onClick={()=>{localStorage.removeItem(STORAGE_KEY); location.reload();}}>Reset local demo data</button></div></section>}
+      {page==='dashboard' && <Dashboard income={income} expenses={expenses} balance={balance} members={data.members.length} paid={paidThisMonth} unpaid={unpaid} data={data}/>} 
+      {page==='members' && <Members members={visibleMembers} update={update} data={data} setModal={setModal}/>} 
+      {page==='transactions' && <Transactions data={data} update={update} setModal={setModal}/>} 
+      {page==='reports' && <Reports data={data} income={income} expenses={expenses} balance={balance}/>} 
+      {page==='stock' && <Stock data={data} update={update}/>} 
+      {page==='poster' && <Poster data={data}/>} 
+      {page==='settings' && <Settings data={data} update={update}/>} 
     </main>
-
-    {modal === 'quick' && <Modal title="Quick Add" onClose={()=>setModal(null)}><div className="quick"><button onClick={()=>setModal('member')}>Add member</button><button onClick={()=>setModal('transaction')}>Add payment / expense</button><button onClick={()=>setTab('poster') || setModal(null)}>Open poster</button></div></Modal>}
-    {modal === 'member' && <Modal title="Add member" onClose={()=>setModal(null)}><SimpleMember onSave={addMember} /></Modal>}
-    {modal === 'transaction' && <Modal title="Add transaction" onClose={()=>setModal(null)}><SimpleTransaction members={data.members} onSave={addTransaction} /></Modal>}
-  </>;
+    {modal && <QuickModal modal={modal} setModal={setModal} data={data} update={update}/>} 
+  </div>
 }
 
-function SimpleMember({ onSave }) {
-  const [name, setName] = useState('');
-  return <div className="form"><input autoFocus placeholder="Member name" value={name} onChange={e=>setName(e.target.value)} /><button className="primary" disabled={!name.trim()} onClick={()=>onSave(name.trim())}>Save</button></div>;
-}
+function label(x){ return ({dashboard:'Dashboard',members:'Members',transactions:'Transactions',reports:'Reports',stock:'Stock',poster:'Poster Studio',settings:'Settings'})[x] || x; }
+function money(n){ return '£' + Number(n).toFixed(2); }
 
-function SimpleTransaction({ members, onSave }) {
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0,10), type: 'payment', member: '', category: 'Membership', amount: 6, note: '' });
-  const set = (k,v) => setForm({ ...form, [k]: v });
-  return <div className="form">
-    <input type="date" value={form.date} onChange={e=>set('date', e.target.value)} />
-    <select value={form.type} onChange={e=>set('type', e.target.value)}><option>payment</option><option>expense</option><option>correction</option></select>
-    <select value={form.member} onChange={e=>set('member', e.target.value)}><option value="">No member</option>{members.map(m=><option key={m.id}>{m.name}</option>)}</select>
-    <input placeholder="Category" value={form.category} onChange={e=>set('category', e.target.value)} />
-    <input type="number" step="0.01" value={form.amount} onChange={e=>set('amount', e.target.value)} />
-    <input placeholder="Note" value={form.note} onChange={e=>set('note', e.target.value)} />
-    <button className="primary" onClick={()=>onSave(form)}>Save transaction</button>
-  </div>;
+function Dashboard({income, expenses, balance, members, paid, unpaid, data}){
+  return <section>
+    <div className="grid cards">
+      <Card title="Balance" value={money(balance)} note="Current club money" />
+      <Card title="Income" value={money(income)} note="All payments" />
+      <Card title="Expenses" value={money(expenses)} note="All spending" />
+      <Card title="Members" value={members} note={`${paid} paid this month, ${unpaid} unpaid`} />
+    </div>
+    <div className="panel"><h2>Latest activity</h2>{data.transactions.slice(-5).reverse().map(t=><div className="row" key={t.id}><span>{t.date}</span><b>{t.type}</b><span>{t.member || t.category}</span><strong>{money(t.amount)}</strong></div>)}</div>
+    <div className="notice">Spreadsheet reload is disabled. This version will not restore original sheet data automatically.</div>
+  </section>
+}
+function Card({title,value,note}){ return <div className="card"><span>{title}</span><strong>{value}</strong><small>{note}</small></div> }
+
+function Members({members, data, update}){
+  const toggle = (id, mIdx) => {
+    const next = {...data, members: data.members.map(m => m.id===id ? {...m, paid: m.paid.includes(mIdx) ? m.paid.filter(x=>x!==mIdx) : [...m.paid, mIdx].sort((a,b)=>a-b)} : m)};
+    update(next);
+  };
+  return <section className="panel"><h2>Members calendar</h2>{members.map(m=><div className="member" key={m.id}><div><b>{m.name}</b><span>{m.role} • {m.notes}</span></div><div className="months">{MONTHS.map((mo,i)=><button key={mo} className={m.paid.includes(i)?'paid':'unpaid'} onClick={()=>toggle(m.id,i)}>{mo}</button>)}</div></div>)}</section>
+}
+function Transactions({data, update, setModal}){
+  return <section className="panel"><div className="panelHead"><h2>Transactions</h2><button className="primary" onClick={()=>setModal('transaction')}>Add transaction</button></div>{data.transactions.map(t=><div className="row" key={t.id}><span>{t.date}</span><b className={t.type}>{t.type}</b><span>{t.member || t.category}</span><span>{t.note}</span><strong>{money(t.amount)}</strong></div>)}</section>
+}
+function Reports({data,income,expenses,balance}){
+  const payments = data.transactions.filter(t=>t.type==='payment');
+  const spend = data.transactions.filter(t=>t.type==='expense');
+  return <section className="grid two"><div className="panel"><h2>Mini report</h2><p>Total paid: <b>{money(income)}</b></p><p>Total spent: <b>{money(expenses)}</b></p><p>Balance: <b>{money(balance)}</b></p><p>Payments count: <b>{payments.length}</b></p><p>Expenses count: <b>{spend.length}</b></p></div><div className="panel"><h2>Sort/filter ready</h2><p>Next ZIP will connect this with advanced date filters, member filters and export.</p></div></section>
+}
+function Stock({data, update}){
+  return <section className="panel"><h2>Supplies / Stock</h2>{data.stock.map(s=><div className="row" key={s.id}><b>{s.item}</b><span>{s.category}</span><span>Qty: {s.qty}</span><strong className={s.qty<=s.low?'danger':'ok'}>{s.qty<=s.low?'Low stock':'OK'}</strong></div>)}</section>
+}
+function Poster({data}){
+  return <section className="posterWrap"><div className="poster"><div className="posterLogo">RM</div><h1>{data.settings.clubName}</h1><h2>Members</h2><div className="posterMembers">{data.members.map(m=><span key={m.id}>{m.name}</span>)}</div><p>Generated by RM Tea Club Manager {VERSION}</p></div><button onClick={()=>window.print()} className="primary">Download / Print poster</button></section>
+}
+function Settings({data, update}){
+  return <section className="panel"><h2>Settings</h2><label>Monthly fee <input type="number" value={data.settings.monthlyFee} onChange={e=>update({...data, settings:{...data.settings, monthlyFee:Number(e.target.value)}})} /></label><label>Club name <input value={data.settings.clubName} onChange={e=>update({...data, settings:{...data.settings, clubName:e.target.value}})} /></label><div className="notice dangerBg">Original spreadsheet auto reload: OFF</div></section>
+}
+function QuickModal({modal,setModal,data,update}){
+  const [form,setForm]=useState({date:new Date().toISOString().slice(0,10), type:'payment', member:'', category:'membership', amount:6, note:''});
+  const add = () => { update({...data, transactions:[...data.transactions,{...form,id:'t'+Date.now(), amount:Number(form.amount)}]}); setModal(null); };
+  return <div className="overlay" onClick={()=>setModal(null)}><div className="modal" onClick={e=>e.stopPropagation()}><h2>{modal==='transaction'?'Add transaction':'Quick add'}</h2><div className="form"><input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/><select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option>payment</option><option>expense</option></select><input placeholder="Member" value={form.member} onChange={e=>setForm({...form,member:e.target.value})}/><input placeholder="Category" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}/><input type="number" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})}/><input placeholder="Note" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/></div><div className="actions"><button onClick={()=>setModal(null)}>Cancel</button><button className="primary" onClick={add}>Save</button></div></div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App />);

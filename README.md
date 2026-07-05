@@ -1,11 +1,9 @@
-# RM Tea Club Manager v2 ZIP
+# RM Tea Club Manager v2.1 SAFE
 
 Firebase App Hosting safe version.
 
-Upload these project files to GitHub. Do not upload node_modules or dist.
-
-Scripts:
-- npm run build
-- npm start
-
-This version uses local browser storage only. Firestore connection will be added in the next ZIP once deployment is stable.
+Important:
+- No automatic spreadsheet reload.
+- No automatic Firestore overwrite.
+- No seed data import on start.
+- Demo data is local browser fallback only.

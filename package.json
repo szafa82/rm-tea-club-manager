@@ -1,18 +1,20 @@
 {
   "name": "rm-tea-club-manager",
-  "version": "2.0.0",
+  "version": "2.1.0-safe",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "vite",
+    "build": "vite --host 0.0.0.0"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "firebase": "latest",
+    "express": "latest"
   },
   "devDependencies": {}
 }
