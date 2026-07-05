@@ -1,3 +1,3 @@
-# RM Tea Club Manager v4 Visible
+# RM Tea Club Manager - v4 HARD TEST
 
-Visible UI update. Spreadsheet reload disabled. Firestore overwrite disabled.
+This build is intentionally visually obvious. If deployed correctly, the app shows a large purple/red test screen.
