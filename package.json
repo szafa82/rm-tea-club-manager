@@ -1,7 +1,7 @@
 {
   "name": "rm-tea-club-manager",
   "private": true,
-  "version": "4.2.0-working-add-member",
+  "version": "4.3.0-really-working-add-member",
   "type": "module",
   "scripts": {
     "start": "vite preview --host 0.0.0.0 --port $PORT",
