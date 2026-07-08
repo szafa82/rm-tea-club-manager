@@ -1,11 +1,3 @@
-# RM Tea Club Manager v4.1 Add Members Fix
+# RM Tea Club Manager v4.2 Working Add Member
 
-Full project package for Firebase App Hosting.
-
-Changes:
-- Add member modal works.
-- Members are saved in browser localStorage after refresh.
-- Spreadsheet reload remains OFF.
-- Firestore overwrite remains OFF.
-
-Upload the contents of this folder to GitHub. Do not upload node_modules or dist.
+Visible test build. Add member works in browser localStorage. Firestore sync is not connected yet.

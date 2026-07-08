@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Users, Wallet, ReceiptText, BarChart3, Package, Image, Settings, Plus, Search, Bell, Download, Coffee, ShieldCheck, X } from 'lucide-react';
+import { Users, Wallet, ReceiptText, BarChart3, Package, Image, Settings, Plus, Search, Bell, Download, Coffee, ShieldCheck, X, RotateCcw } from 'lucide-react';
 import './styles.css';
 
 const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const STORAGE_KEY = 'rm-tea-club-members-v4';
+const STORAGE_KEY = 'rm-tea-club-members-v4-2-working';
+const BUILD_LABEL = 'v4.2 ADD MEMBER WORKING - 2026-07-08';
 
 const initialMembers = [
   { id: 1, name: 'Abbas', tag: 'Paid ahead', paid: [0,1,2,3,4,5,6,7,8,9,10,11], note: 'Paid until end of year' },
@@ -27,7 +28,7 @@ function loadMembers() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return initialMembers;
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed : initialMembers;
+    return Array.isArray(parsed) && parsed.length ? parsed : initialMembers;
   } catch {
     return initialMembers;
   }
@@ -55,42 +56,60 @@ function App() {
     ['Dashboard', BarChart3], ['Members', Users], ['Transactions', ReceiptText], ['Reports', Wallet], ['Stock', Package], ['Poster Studio', Image], ['Settings', Settings]
   ];
 
+  function showToast(message) {
+    setToast(message);
+    setTimeout(() => setToast(''), 2500);
+  }
+
   function addMember(member) {
     const cleanName = member.name.trim();
-    if (!cleanName) return;
+    if (!cleanName) {
+      showToast('Name required');
+      return;
+    }
     const newMember = {
       id: Date.now(),
       name: cleanName,
       tag: member.tag || 'Active',
-      paid: member.paid,
+      paid: member.paid || [],
       note: member.note?.trim() || 'New member'
     };
     setMembers(prev => [...prev, newMember].sort((a,b) => a.name.localeCompare(b.name)));
     setModal(null);
-    setToast(`${cleanName} added`);
-    setTimeout(() => setToast(''), 2500);
     setActive('Members');
+    setQuery('');
+    showToast(`${cleanName} added and saved in this browser`);
+  }
+
+  function addTestMember() {
+    const testName = `Test Member ${members.length + 1}`;
+    addMember({ name: testName, tag: 'Active', paid: [6], note: 'Added with one-click test button' });
   }
 
   function deleteMember(id) {
     setMembers(prev => prev.filter(m => m.id !== id));
-    setToast('Member removed');
-    setTimeout(() => setToast(''), 2500);
+    showToast('Member removed');
+  }
+
+  function resetMembers() {
+    localStorage.removeItem(STORAGE_KEY);
+    setMembers(initialMembers);
+    showToast('Local member list reset');
   }
 
   const filteredMembers = members.filter(m => m.name.toLowerCase().includes(query.toLowerCase()));
 
   return <div className="app">
     <aside className="sidebar">
-      <div className="brand"><div className="logo">RM</div><div><b>Tea Club</b><span>Enterprise v4.1</span></div></div>
+      <div className="brand"><div className="logo">RM</div><div><b>Tea Club</b><span>Enterprise v4.2</span></div></div>
       {nav.map(([name, Icon]) => <button key={name} onClick={() => setActive(name)} className={active===name?'active':''}><Icon size={18}/>{name}</button>)}
       <div className="safe"><ShieldCheck size={17}/> Spreadsheet reload OFF</div>
     </aside>
 
     <main className="main">
       <header className="topbar">
-        <div><span className="version">v4.1 ADD MEMBERS FIX</span><h1>{active}</h1></div>
-        <div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search members, payments, stock..." /></div>
+        <div><span className="version">{BUILD_LABEL}</span><h1>{active}</h1></div>
+        <div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search members..." /></div>
         <button className="icon"><Bell size={18}/><span></span></button>
         <button className="primary" onClick={()=>setModal('addMember')}><Plus size={18}/>Add member</button>
       </header>
@@ -98,25 +117,20 @@ function App() {
       {toast && <div className="toast">{toast}</div>}
 
       {active === 'Dashboard' && <section className="grid">
+        <div className="panel wide notice"><h2>✅ Add member test build</h2><p>If you see this box, the new code is live. Use the red <b>Add member</b> button or the one-click test below.</p><button className="primary" onClick={addTestMember}><Plus size={16}/>Add test member now</button></div>
         <Stat title="Members" value={members.length} />
         <Stat title="Balance" value={`£${stats.balance.toFixed(2)}`} tone="green" />
         <Stat title="Paid in" value={`£${stats.paid.toFixed(2)}`} />
         <Stat title="Spent" value={`£${stats.spent.toFixed(2)}`} tone="red" />
         <Stat title="Outstanding" value={stats.outstanding} tone="orange" />
         <div className="panel wide"><h2>Cash flow</h2><div className="bars"><i style={{height:'70%'}}/><i style={{height:'45%'}}/><i style={{height:'88%'}}/><i style={{height:'52%'}}/><i style={{height:'78%'}}/><i style={{height:'35%'}}/></div></div>
-        <div className="panel"><h2>Alerts</h2><p className="alert good">✓ Add member now works locally</p><p className="alert good">✓ New members stay after refresh</p><p className="alert">⚠ Firestore sync next step</p></div>
+        <div className="panel"><h2>Alerts</h2><p className="alert good">✓ Add member saves to browser localStorage</p><p className="alert good">✓ Members remain after refresh on same device/browser</p><p className="alert">⚠ Firestore sync is not connected yet</p></div>
       </section>}
 
       {active === 'Members' && <section>
-        <div className="panel-title member-toolbar">
-          <h2>Members ({filteredMembers.length})</h2>
-          <button className="primary" onClick={()=>setModal('addMember')}><Plus size={16}/>Add new member</button>
-        </div>
+        <div className="panel-title member-toolbar"><h2>Members ({filteredMembers.length})</h2><div className="actions"><button onClick={resetMembers}><RotateCcw size={16}/>Reset local list</button><button className="primary" onClick={()=>setModal('addMember')}><Plus size={16}/>Add new member</button></div></div>
         <div className="members">{filteredMembers.map(m => <div className="member" key={m.id}>
-          <div className="member-top">
-            <div className="avatar">{m.name[0]}</div>
-            <button className="danger" title="Remove member" onClick={() => deleteMember(m.id)}><X size={15}/></button>
-          </div>
+          <div className="member-top"><div className="avatar">{m.name[0]}</div><button className="danger" title="Remove member" onClick={() => deleteMember(m.id)}><X size={15}/></button></div>
           <div className="member-head"><h3>{m.name}</h3><span>{m.tag}</span></div>
           <p>{m.note}</p>
           <div className="months">{months.map((mo,i)=><b key={mo} className={m.paid.includes(i)?'paid':i<6?'late':'future'}>{mo}</b>)}</div>
@@ -131,7 +145,7 @@ function App() {
 
       {active === 'Poster Studio' && <section className="poster"><div className="poster-card"><Coffee size={42}/><h1>RM Tea Club</h1><p>Premium member list</p><div>{members.map(m=><span key={m.id}>{m.name}</span>)}</div></div><button className="primary">Download poster</button></section>}
 
-      {active === 'Settings' && <section className="panel"><h2>Settings</h2><p><b>Monthly fee:</b> £6</p><p><b>Year:</b> 2026</p><p><b>Spreadsheet reload:</b> OFF</p><p><b>Firestore overwrite:</b> OFF</p><p><b>Member saving:</b> Browser localStorage ON</p></section>}
+      {active === 'Settings' && <section className="panel"><h2>Settings</h2><p><b>Monthly fee:</b> £6</p><p><b>Year:</b> 2026</p><p><b>Spreadsheet reload:</b> OFF</p><p><b>Firestore overwrite:</b> OFF</p><p><b>Member saving:</b> Browser localStorage ON</p><p><b>Build:</b> {BUILD_LABEL}</p></section>}
     </main>
 
     {modal === 'addMember' && <AddMemberModal onClose={() => setModal(null)} onSave={addMember} />}
